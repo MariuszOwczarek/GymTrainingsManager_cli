@@ -1,8 +1,9 @@
-from models.exercise import Exercise, MuscleGroup, Equipment, Difficulty
+from models.exercise import Exercise, MuscleGroup, Equipment, Difficulty, ExerciseStatus
 import pytest
 import json
 from repositories.json_exercise_repository import JsonExerciseRepository
 from exceptions.execrise_exceptions import InvalidExerciseError, ExerciseAlreadyExistsError, ExerciseNotFoundError
+from services.exercise_service import ExerciseService
 
 # =========================================================
 # EXERCISE TESTS 
@@ -15,7 +16,8 @@ def exercise_1():
             name="Barbell Bench Press",
             muscle_group=MuscleGroup.CHEST,
             equipment=Equipment.BARBELL,
-            difficulty=Difficulty.INTERMEDIATE
+            difficulty=Difficulty.INTERMEDIATE,
+            status= ExerciseStatus.ACTIVE
         )
     return exercise_1
 
@@ -26,7 +28,8 @@ def exercise_2():
             name="Trying Biceps",
             muscle_group=MuscleGroup.BICEPS,
             equipment=Equipment.DUMBBELL,
-            difficulty=Difficulty.BEGINNER
+            difficulty=Difficulty.BEGINNER,
+            status = ExerciseStatus.ACTIVE
         )
     return exercise_2
 
@@ -36,7 +39,7 @@ def test_create_exercise(exercise_1):
     assert exercise_1.muscle_group == MuscleGroup.CHEST
     assert exercise_1.equipment == Equipment.BARBELL
     assert exercise_1.difficulty == Difficulty.INTERMEDIATE
-
+    assert exercise_1.status == ExerciseStatus.ACTIVE
 
 def test_str_exercise(exercise_1):
     assert str(exercise_1) == "Exercise ID: 1, Name: Barbell Bench Press, Muscle Group: Chest, Equipment: Barbell, Difficulty: Intermediate"
@@ -58,7 +61,8 @@ def test_exercise_save_to_file(tmp_path, exercise_1):
                     "name": exercise_1.name,
                     "muscle_group": str(exercise_1.muscle_group.value),
                     "equipment": str(exercise_1.equipment.value),
-                    "difficulty": str(exercise_1.difficulty.value)
+                    "difficulty": str(exercise_1.difficulty.value),
+                    "status": str(exercise_1.status.value)
                 }
 
     assert data == [file_dict]
@@ -81,7 +85,8 @@ def test_two_exercises_save_to_file(tmp_path, exercise_1, exercise_2):
                     "name": exercise_1.name,
                     "muscle_group": str(exercise_1.muscle_group.value),
                     "equipment": str(exercise_1.equipment.value),
-                    "difficulty": str(exercise_1.difficulty.value)
+                    "difficulty": str(exercise_1.difficulty.value),
+                    "status": str(exercise_1.status.value)
                 }
                 
     exercise_2_data = {
@@ -89,7 +94,8 @@ def test_two_exercises_save_to_file(tmp_path, exercise_1, exercise_2):
                     "name": exercise_2.name,
                     "muscle_group": str(exercise_2.muscle_group.value),
                     "equipment": str(exercise_2.equipment.value),
-                    "difficulty": str(exercise_2.difficulty.value)
+                    "difficulty": str(exercise_2.difficulty.value),
+                    "status": str(exercise_2.status.value)
                 }
 
     assert data == [exercise_1_data, exercise_2_data]
@@ -111,6 +117,7 @@ def test_exercises_load_from_repo(tmp_path, exercise_1):
     assert loaded_exercise.muscle_group == exercise_1.muscle_group
     assert loaded_exercise.equipment == exercise_1.equipment
     assert loaded_exercise.difficulty == exercise_1.difficulty
+    assert loaded_exercise.status == exercise_1.status
 
 
 def test_add_None(tmp_path):
@@ -189,3 +196,104 @@ def test_delete_id_not_in_repository(tmp_path, exercise_1, exercise_2):
 
         with pytest.raises(ExerciseNotFoundError):
             repository.delete(exercise_2.exercise_id)
+
+# =========================================================
+# SERVICE TESTS 
+# =========================================================
+
+def test_add_exercise_to_repository_check_id(tmp_path):
+    file_path = tmp_path / "test.json"
+    repository = JsonExerciseRepository(file_path)
+    service = ExerciseService(repository)
+    exercise = service.add_exercise(name='Test', muscle_group=MuscleGroup.CHEST, equipment=Equipment.BARBELL, difficulty=Difficulty.BEGINNER)
+
+    assert exercise.exercise_id == 1
+    assert exercise in repository.get_all()
+
+
+def test_add_exercises_service_to_repository_check_id(tmp_path, exercise_1, exercise_2):
+    file_path = tmp_path / "test.json"
+    repository = JsonExerciseRepository(file_path)
+    repository.add(exercise_1)
+    repository.add(exercise_2)
+    service = ExerciseService(repository)
+    exercise = service.add_exercise(name='Test', muscle_group=MuscleGroup.CHEST, equipment=Equipment.BARBELL, difficulty=Difficulty.BEGINNER)
+
+    assert exercise.exercise_id == 3
+    assert exercise in repository.get_all() 
+
+
+def test_get_exercise_service_to_repository(tmp_path, exercise_1):
+    file_path = tmp_path / "test.json"
+    repository = JsonExerciseRepository(file_path)
+    repository.add(exercise_1)
+    service = ExerciseService(repository)
+    exercise = service.get_exercise(exercise_1.exercise_id)
+
+    assert exercise.exercise_id == 1
+    assert exercise is exercise_1
+
+def test_get_all_exercise_service_to_repository(tmp_path, exercise_1, exercise_2):
+    file_path = tmp_path / "test.json"
+    repository = JsonExerciseRepository(file_path)
+    repository.add(exercise_1)
+    repository.add(exercise_2)
+    service = ExerciseService(repository)
+    exercises = service.get_all_exercises()
+
+    assert len(exercises) == 2
+    assert exercise_1 in exercises
+    assert exercise_2 in exercises
+
+def test_exercise_status(tmp_path):
+    file_path = tmp_path / "test.json"
+    repository = JsonExerciseRepository(file_path)
+    service = ExerciseService(repository)
+    exercise = service.add_exercise(name='Test', muscle_group=MuscleGroup.CHEST, equipment=Equipment.BARBELL, difficulty=Difficulty.BEGINNER)
+    repository.save()
+
+    assert file_path.exists()
+    
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+
+    file_dict = {
+                    "exercise_id" : exercise.exercise_id,
+                    "name": exercise.name,
+                    "muscle_group": str(exercise.muscle_group.value),
+                    "equipment": str(exercise.equipment.value),
+                    "difficulty": str(exercise.difficulty.value),
+                    "status": str(exercise.status.value)
+                }
+
+    assert data == [file_dict]
+
+
+def test_delete_exercise_service_to_repository(tmp_path):
+    file_path = tmp_path / "test.json"
+    repository = JsonExerciseRepository(file_path)
+    service = ExerciseService(repository)
+    exercise = service.add_exercise(name='Test', muscle_group=MuscleGroup.CHEST, equipment=Equipment.BARBELL, difficulty=Difficulty.BEGINNER)
+    service.delete_exercise(exercise.exercise_id)
+    all_exercises = service.get_all_exercises()
+
+    assert exercise in all_exercises 
+    assert exercise.status == ExerciseStatus.INACTIVE
+
+
+def test_get_all_and_active_exercises_service(tmp_path, exercise_1, exercise_2):
+    file_path = tmp_path / "test.json"
+    repository = JsonExerciseRepository(file_path)
+    repository.add(exercise_1)
+    repository.add(exercise_2)
+    service = ExerciseService(repository)
+    service.delete_exercise(exercise_1.exercise_id)
+    all_exercises = service.get_all_exercises()
+    active_exercises = service.get_active_exercises()
+
+    assert len(active_exercises) == 1
+    assert len(all_exercises) == 2
+    assert exercise_2 in all_exercises
+    assert exercise_1 not in active_exercises
+    assert exercise_1 in all_exercises
+    assert exercise_1.status == ExerciseStatus.INACTIVE

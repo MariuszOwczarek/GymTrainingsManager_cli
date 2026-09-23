@@ -1,4 +1,4 @@
-from models.exercise import Exercise, MuscleGroup, Equipment, Difficulty
+from models.exercise import Exercise, MuscleGroup, Equipment, Difficulty, ExerciseStatus
 from repositories.exercise_repository import ExerciseRepository
 from pathlib import Path
 import json
@@ -58,7 +58,7 @@ class JsonExerciseRepository(ExerciseRepository):
         if exercise_id not in self.exercises:
             raise ExerciseNotFoundError(f"Exercise with ID {exercise_id} was not found")
 
-        del self.exercises[exercise_id]
+        self.exercises[exercise_id].status = ExerciseStatus.INACTIVE
 
 
     def save(self) -> None:
@@ -71,7 +71,8 @@ class JsonExerciseRepository(ExerciseRepository):
                 "name": exercise.name,
                 "muscle_group": str(exercise.muscle_group.value),
                 "equipment": str(exercise.equipment.value),
-                "difficulty": str(exercise.difficulty.value)
+                "difficulty": str(exercise.difficulty.value),
+                "status": str(exercise.status.value)
             }
 
             data_all.append(data)
@@ -92,7 +93,8 @@ class JsonExerciseRepository(ExerciseRepository):
                 exercise_data["name"],
                 MuscleGroup(exercise_data["muscle_group"]),
                 Equipment(exercise_data["equipment"]),
-                Difficulty(exercise_data["difficulty"])
+                Difficulty(exercise_data["difficulty"]),
+                ExerciseStatus(exercise_data["status"])
             ) 
 
             self.add(exercise)
